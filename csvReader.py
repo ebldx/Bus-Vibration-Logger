@@ -1,6 +1,7 @@
 import requests
 import zipfile
 import os
+import pathlib as pl
 import sys
 import datetime as dt
 import csv
@@ -30,10 +31,9 @@ for file in apiData:
 
 #DOWNLOADING
 filenameZip = searchName[5:]
-try:
-	zipFile = open(filenameZip)
+if (os.path.exists(filenameZip)):
 	print("Zipfile already present!")
-except FileNotFoundError:
+else:
 	if (dlLink != None):
 		print(f"Downloading file from {dlLink}")
 		dlReturn = requests.get(dlLink, stream=True)
@@ -51,46 +51,61 @@ except FileNotFoundError:
 
 #UNZIPPING
 dirName = filenameZip[:-5]
-try:
-	os.mkdir(dirName)
-except FileExistsError:
+if (os.path.exists(dirName)):
 	print("Unzipped file already present!")
-unzip_destination = f".\\{dirName}\\"
+else:
+	os.mkdir(dirName)
+unzip_destination = pl.Path(dirName)
 with zipfile.ZipFile(filenameZip, "r") as gtfsZip:
 	gtfsZip.extractall(path=unzip_destination, members=["trips.txt", "stop_times.txt", "stops.txt"])
-gtfsZip.close()
 
+
+#Finding route name.
+routeName = None
+routeNameList = []
+with open(unzip_destination / "trips.txt", "r", encoding="utf-8") as tripsFile:
+	csvReader = csv.DictReader(tripsFile, delimiter=",")
+	for row in csvReader:
+		if (not(row["trip_headsign"] in routeNameList)):
+			routeNameList.append(row["trip_headsign"])
+
+while (not(routeName in routeNameList)):
+	search = input("\nSearch for a route: ").strip().lower()
+	matches = [route for route in routeNameList if search in route.lower()]
+	print("Results:")
+	for name in matches:
+		print(f"\t{name}")
+	routeName = input("Insert a valid route name: ")
 
 #Finding trip ids associated with the route.
-routeName = "Sarpsborg-Ise"
+print("Finding trip IDs associated with the route...")
 routeIds = []
-with open(f"{unzip_destination}trips.txt", "r", encoding="utf-8") as tripsFile:
-	csvReader = csv.reader(tripsFile, delimiter=",")
+with open(unzip_destination / "trips.txt", "r", encoding="utf-8") as tripsFile:
+	csvReader = csv.DictReader(tripsFile, delimiter=",")
 	for row in csvReader:
-		if (row[3] == routeName):
-			routeIds.append(row[1])
-tripsFile.close()
+		if (row["trip_headsign"] == routeName):
+			routeIds.append(row["trip_id"])
 
 
 #STORING STOP PASSING TIMES FOR ROUTE
+print("Saving valid stop passing timestamps...")
 stopPassings = []
-with open(f"{unzip_destination}stop_times.txt", "r", encoding="utf-8") as stopTimesFile:
-	csvReader = csv.reader(stopTimesFile, delimiter=",")
+with open(unzip_destination / "stop_times.txt", "r", encoding="utf-8") as stopTimesFile:
+	csvReader = csv.DictReader(stopTimesFile, delimiter=",")
 	for row in csvReader:
-		if (row[0] in routeIds):
+		if (row["trip_id"] in routeIds):
 			stopPassings.append(row)
-stopTimesFile.close()
 
 #Saving the stop IDs associated with the route.
-stopId2Name = {stop[1]:"" for stop in stopPassings}
+print("Saving valid stop IDs...")
+stopId2Name = {stop["stop_id"]:"" for stop in stopPassings}
 stopName2Id = {}
-with open(f"{unzip_destination}stops.txt", "r", encoding="utf-8") as stopsFile:
-	csvReader = csv.reader(stopsFile, delimiter=",")
+with open(unzip_destination / "stops.txt", "r", encoding="utf-8") as stopsFile:
+	csvReader = csv.DictReader(stopsFile, delimiter=",")
 	for row in csvReader:
-		if (row[0] in stopId2Name.keys()):
-			stopId2Name[row[0]] = row[1]
-			stopName2Id[row[1]] = row[0]
-stopsFile.close()
+		if (row["stop_id"] in stopId2Name.keys()):
+			stopId2Name[row["stop_id"]] = row["stop_name"]
+			stopName2Id[row["stop_name"]] = row["stop_id"]
 
 startStopName = None
 endStopName = None
@@ -134,24 +149,25 @@ class BusPassInstance:
 def fetchVibData(csvFileName:str, startDT:dt.datetime, endDT:dt.datetime):
 	vibList = []
 	dtList = []
-	csvFile = csv.reader(open(csvFileName))
-	header = next(csvFile)
-	for row in csvFile:
-			rowDT = dt.datetime(int(row[1]), int(row[2]), int(row[3]), int(row[4]), int(row[5]), int(row[6]))
-			if (startDT <= rowDT <= endDT):
-				dtList.append(rowDT)
-				vibList.append(int(row[-1]))
-			elif (rowDT > endDT):
-				return dtList, vibList
+	with open(csvFileName) as csvFile:
+		csvReader = csv.DictReader(csvFile)
+		for row in csvReader:
+				rowDT = dt.datetime(int(row["year"]), int(row["month"]), int(row["day"]), int(row["hour"]), int(row["minute"]), int(row["second"]))
+				if (startDT <= rowDT <= endDT):
+					dtList.append(rowDT)
+					vibList.append(int(row["vibration"]))
+				elif (rowDT > endDT):
+					return dtList, vibList
+	return dtList, vibList
 
 passInstances = []
-
-for passedStop in stopPassings: #WILL STRUGGLE IF NO STARTSTOP IS DEFINED
-	if (passedStop[1] == startStopId):
-		hours, minutes, seconds = passedStop[2].split(":")
+print("Saving stop passings...")
+for passedStop in stopPassings:
+	if (passedStop["stop_id"] == startStopId):
+		hours, minutes, seconds = passedStop["arrival_time"].split(":")
 		startDateTime = dt.datetime(int(date["year"]), int(date["month"]), int(date["day"]), int(hours), int(minutes), int(seconds))
-	elif ((passedStop[1] == endStopId) and startDateTime):
-		hours, minutes, seconds = passedStop[2].split(":")
+	elif ((passedStop["stop_id"] == endStopId) and startDateTime):
+		hours, minutes, seconds = passedStop["departure_time"].split(":")
 		endDateTime = dt.datetime(int(date["year"]), int(date["month"]), int(date["day"]), int(hours), int(minutes), int(seconds))
 		x, y = fetchVibData(csvFileName, startDateTime, endDateTime)
 		passInstances.append(BusPassInstance(routeName, startStopName, endStopName, x, y))
@@ -159,4 +175,9 @@ for passedStop in stopPassings: #WILL STRUGGLE IF NO STARTSTOP IS DEFINED
 		endDateTime = None
 
 for busPass in passInstances:
-	busPass.plotSelf()
+	vibDetected = False
+	for vibration in busPass.vibValues:
+		if (vibration > 0):
+			vibDetected = True
+	if (vibDetected):
+		busPass.plotSelf()
