@@ -160,19 +160,22 @@ def fetchVibData(csvFileName:str, startDT:dt.datetime, endDT:dt.datetime):
 					return dtList, vibList
 	return dtList, vibList
 
+tripId = None
 passInstances = []
 print("Saving stop passings...")
 for passedStop in stopPassings:
 	if (passedStop["stop_id"] == startStopId):
 		hours, minutes, seconds = passedStop["arrival_time"].split(":")
 		startDateTime = dt.datetime(int(date["year"]), int(date["month"]), int(date["day"]), int(hours), int(minutes), int(seconds))
-	elif ((passedStop["stop_id"] == endStopId) and startDateTime):
+		tripId = passedStop["trip_id"]
+	elif ((passedStop["stop_id"] == endStopId) and startDateTime and (tripId == passedStop["trip_id"])):
 		hours, minutes, seconds = passedStop["departure_time"].split(":")
 		endDateTime = dt.datetime(int(date["year"]), int(date["month"]), int(date["day"]), int(hours), int(minutes), int(seconds))
 		x, y = fetchVibData(csvFileName, startDateTime, endDateTime)
 		passInstances.append(BusPassInstance(routeName, startStopName, endStopName, x, y))
 		startDateTime = None
 		endDateTime = None
+		tripId = None
 
 for busPass in passInstances:
 	vibDetected = False
