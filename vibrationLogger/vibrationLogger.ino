@@ -10,7 +10,6 @@ const char LOG_FILENAME[] = "VIBRATION_LOG.csv";
 
 
 struct Log_Entry {
-  uint8_t weekday;
   uint16_t year;
   uint8_t month;
   uint8_t day;
@@ -46,8 +45,8 @@ void setup() {
     Serial.println("Couldn't create logfile");
     while (1);
   };
-  logFile.println("weekday,year,month,day,hour,minute,second,vibration");
-  Serial.println("weekday,year,month,day,hour,minute,second,vibration");
+  logFile.println("year,month,day,hour,minute,second,vibration");
+  Serial.println("year,month,day,hour,minute,second,vibration");
 };
 
 void loop() {
@@ -57,8 +56,6 @@ void loop() {
     if (dataIndex >= SAVE_INTERVAL/LOOP_INTERVAL) {
       Serial.println("Saving data to SD card...");
       for (int i = 0; i < dataIndex; i++) {
-        logFile.print(tempData[i].weekday);
-        logFile.print(",");
         logFile.print(tempData[i].year, DEC);
         logFile.print(",");
         logFile.print(tempData[i].month, DEC);
@@ -78,7 +75,6 @@ void loop() {
       dataIndex = 0;
     };
     if (dataIndex < SAVE_INTERVAL/LOOP_INTERVAL) {
-      tempData[dataIndex].weekday = now.dayOfTheWeek();
       tempData[dataIndex].year = now.year();
       tempData[dataIndex].month = now.month();
       tempData[dataIndex].day = now.day();
@@ -86,8 +82,6 @@ void loop() {
       tempData[dataIndex].minute = now.minute();
       tempData[dataIndex].second = now.second();
       tempData[dataIndex].vibration = vibration;
-      Serial.print(now.dayOfTheWeek());
-      Serial.print(",");
       Serial.print(now.year(), DEC);
       Serial.print(",");
       Serial.print(now.month(), DEC);
