@@ -45,8 +45,10 @@ void setup() {
     Serial.println("Couldn't create logfile");
     while (1);
   };
-  logFile.println("year,month,day,hour,minute,second,vibration");
-  Serial.println("year,month,day,hour,minute,second,vibration");
+  if (logFile.size() > 0)){
+    logFile.println("year,month,day,hour,minute,second,vibration");
+    Serial.println("year,month,day,hour,minute,second,vibration");
+  }
 };
 
 void loop() {
