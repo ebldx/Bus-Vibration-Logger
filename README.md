@@ -11,7 +11,7 @@ A combined vibration logger and CSV analyser which plots vibration data in the t
 - Python
 - pip
 
-Using GitHub CLI:
+### Using GitHub CLI:
 ```
   // Installing necessary Python and Arduino libraries
   pip install matplotlib requests
